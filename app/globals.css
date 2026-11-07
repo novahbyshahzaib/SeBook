@@ -1,0 +1,63 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #faf7f2; --card: #ffffff; --ink: #1c1a17; --muted: #6b645c;
+  --line: #e8e2d9; --accent: #b45309; --accent-soft: #fef3c7; --green: #15803d;
+  --red: #b91c1c; --radius: 14px;
+}
+body { font-family: Georgia, "Times New Roman", serif; background: var(--bg); color: var(--ink); }
+button { font-family: inherit; cursor: pointer; }
+input, textarea, select { font-family: inherit; }
+a { color: inherit; text-decoration: none; }
+
+.topbar { display: flex; align-items: center; gap: 12px; padding: 16px 24px; background: #1c1a17; color: #faf7f2; position: sticky; top: 0; z-index: 10; }
+.topbar .logo { font-size: 26px; font-weight: bold; letter-spacing: 0.5px; }
+.topbar .logo span { color: #fbbf24; }
+.topbar .tag { font-size: 13px; color: #d6d3d1; font-style: italic; }
+.topbar .spacer { flex: 1; }
+.topbar button { background: #fbbf24; color: #1c1a17; border: none; padding: 9px 16px; border-radius: 999px; font-weight: bold; font-size: 14px; }
+
+.wrap { max-width: 1080px; margin: 0 auto; padding: 28px 20px 80px; }
+h1 { font-size: 34px; line-height: 1.2; }
+.sub { color: var(--muted); font-size: 16px; margin-top: 6px; font-style: italic; }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 16px; margin-top: 24px; }
+.bookcard { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; cursor: pointer; transition: transform .12s, box-shadow .12s; position: relative; }
+.bookcard:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,.08); }
+.bookcard .emoji { font-size: 34px; }
+.bookcard h3 { font-size: 20px; margin: 8px 0 4px; }
+.bookcard .meta { color: var(--muted); font-size: 13px; }
+.bookcard .bar { height: 6px; background: var(--line); border-radius: 99px; margin-top: 12px; overflow: hidden; }
+.bookcard .bar i { display: block; height: 100%; background: var(--accent); }
+.bookcard .del { position: absolute; top: 10px; right: 10px; background: none; border: none; font-size: 16px; color: var(--muted); }
+.bookcard .del:hover { color: var(--red); }
+
+.section { margin-top: 36px; }
+.section h2 { font-size: 22px; margin-bottom: 4px; }
+.section p { color: var(--muted); font-size: 14px; }
+.typegrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; margin-top: 14px; }
+.typecard { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; cursor: pointer; text-align: left; }
+.typecard.sel { border: 2px solid var(--accent); background: var(--accent-soft); }
+.typecard .e { font-size: 26px; }
+.typecard b { display: block; margin: 6px 0 2px; font-size: 16px; }
+.typecard small { color: var(--muted); font-size: 12.5px; line-height: 1.4; display: block; }
+
+.newbook { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; margin-top: 16px; }
+.newbook label { display: block; font-size: 13px; color: var(--muted); margin: 12px 0 4px; }
+.newbook input { width: 100%; padding: 11px 12px; border: 1px solid var(--line); border-radius: 10px; font-size: 16px; background: #fff; }
+.newbook .create { margin-top: 16px; background: var(--accent); color: #fff; border: none; padding: 12px 22px; border-radius: 999px; font-size: 15px; font-weight: bold; }
+.empty { text-align: center; color: var(--muted); padding: 40px 10px; font-style: italic; }
+.goalbox { background: #1c1a17; color: #faf7f2; border-radius: var(--radius); padding: 18px 20px; margin-top: 24px; display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
+.goalbox .big { font-size: 30px; font-weight: bold; }
+.goalbox .lbl { color: #d6d3d1; font-size: 13px; }
+.goalbar { flex: 1; min-width: 180px; height: 10px; background: #44403c; border-radius: 99px; overflow: hidden; }
+.goalbar i { display: block; height: 100%; background: #fbbf24; }
+.footer { text-align: center; color: var(--muted); font-size: 13px; padding: 30px 0; font-style: italic; }
+
+@media (max-width: 640px) {
+  h1 { font-size: 26px; }
+  .topbar .tag { display: none; }
+}
+@media print {
+  .topbar, .no-print { display: none !important; }
+  body { background: #fff; }
+}
