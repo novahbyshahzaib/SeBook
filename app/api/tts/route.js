@@ -48,7 +48,7 @@ export async function POST(req) {
   } catch (err) {
     console.error("Edge TTS failed:", err?.message || err);
     return Response.json(
-      { error: "The read-aloud service did not answer. Check your connection and try again." },
+      { error: "The read-aloud service did not answer. Check your connection and try again.", detail: String(err?.message || err) },
       { status: 502 }
     );
   }
