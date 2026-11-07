@@ -3,7 +3,10 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { BOOK_TYPES } from "../lib/bookTypes";
 import {
-  loadBooks, saveBooks, createBook, bookWordCount, getTodayWords
+  loadBooks, saveBooks, createBook, bookWordCount, getTodayWords,
+  getIntegrationKey, generateIntegrationKey, clearIntegrationKey,
+  isIntegrationEnabled, setIntegrationEnabled, getLastSynced,
+  pushBooksToCloud, pullBooksFromCloud
 } from "../lib/store";
 
 export default function Home() {
@@ -14,12 +17,39 @@ export default function Home() {
   const [type, setType] = useState("novel");
   const [author, setAuthor] = useState("Shahzaib Muzaffar");
   const [today, setToday] = useState(0);
+  const [intKey, setIntKey] = useState("");
+  const [intEnabled, setIntEnabled] = useState(false);
+  const [showKey, setShowKey] = useState(false);
+  const [syncMsg, setSyncMsg] = useState("");
+  const [lastSynced, setLastSynced] = useState(0);
 
   useEffect(() => {
     setBooks(loadBooks());
     setToday(getTodayWords());
+    setIntKey(getIntegrationKey());
+    setIntEnabled(isIntegrationEnabled());
+    setLastSynced(getLastSynced());
     setLoaded(true);
+    if (isIntegrationEnabled()) {
+      pullBooksFromCloud().then((r) => {
+        if (r.changed) setBooks(loadBooks());
+        setLastSynced(getLastSynced());
+      }).catch(() => {});
+    }
   }, []);
+
+  async function syncNow() {
+    setSyncMsg("Syncing…");
+    try {
+      const pulled = await pullBooksFromCloud();
+      if (pulled.changed) setBooks(loadBooks());
+      const pushed = await pushBooksToCloud();
+      setLastSynced(getLastSynced());
+      setSyncMsg(pushed.ok ? "Synced just now." : "Sync failed — check your connection and try again.");
+    } catch {
+      setSyncMsg("Sync failed — check your connection and try again.");
+    }
+  }
 
   const totalWords = books.reduce((n, b) => n + bookWordCount(b), 0);
   const goal = 500;
@@ -30,6 +60,7 @@ export default function Home() {
     const next = [book, ...books];
     setBooks(next);
     saveBooks(next);
+    pushBooksToCloud().catch(() => {});
     router.push(`/book/${book.id}`);
   }
 
@@ -39,6 +70,7 @@ export default function Home() {
     const next = books.filter((b) => b.id !== id);
     setBooks(next);
     saveBooks(next);
+    pushBooksToCloud().catch(() => {});
   }
 
   function handleDuplicate(id, e) {
@@ -75,6 +107,56 @@ export default function Home() {
           </div>
           <div className="goalbar"><i style={{ width: pct + "%" }} /></div>
           <div className="lbl">{pct}% of today&rsquo;s goal</div>
+        </div>
+
+        <div className="section">
+          <h2>🤖 Muse Integration</h2>
+          <p>Let Muse write in this app for you. Turn it on, copy your key, and give the key to Muse in chat. Then you can say “write Chapter 2 of my book” here, and Muse will write it straight into SeBook. The key is the only protection — keep it private like a password.</p>
+          <div className="newbook">
+            <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+              <button className="create" style={{ marginTop: 0 }} onClick={() => {
+                const key = intKey || generateIntegrationKey();
+                setIntKey(key);
+                setShowKey(true);
+                setIntegrationEnabled(true);
+                setIntEnabled(true);
+                syncNow();
+              }}>{intKey ? "Show my key" : "Generate my key"}</button>
+              {intKey && (
+                <>
+                  <button className="toolbtn" onClick={() => {
+                    const next = !intEnabled;
+                    setIntegrationEnabled(next);
+                    setIntEnabled(next);
+                    if (next) syncNow();
+                  }}>{intEnabled ? "Turn off" : "Turn on"}</button>
+                  <button className="toolbtn" onClick={syncNow}>Sync now</button>
+                  <button className="toolbtn" onClick={() => {
+                    if (!window.confirm("Remove the key? Muse will no longer be able to write in this app until you make a new one.")) return;
+                    clearIntegrationKey();
+                    setIntKey("");
+                    setIntEnabled(false);
+                    setShowKey(false);
+                  }}>Remove key</button>
+                </>
+              )}
+            </div>
+            {intKey && showKey && (
+              <div style={{ marginTop: 14 }}>
+                <label>Your integration key — give this to Muse in chat</label>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <input readOnly value={intKey} onFocus={(e) => e.target.select()} style={{ fontFamily: "monospace" }} />
+                  <button className="toolbtn" onClick={() => { navigator.clipboard?.writeText(intKey); setSyncMsg("Key copied. Paste it to Muse in chat."); }}>Copy</button>
+                </div>
+              </div>
+            )}
+            <p style={{ marginTop: 10, fontSize: 13 }}>
+              Status: {intEnabled ? "On — Muse can write here." : intKey ? "Off — key exists but Muse cannot write until you turn it on." : "Off — no key yet."}
+              {lastSynced > 0 && <> Last synced {new Date(lastSynced).toLocaleTimeString()}.</>}
+              {syncMsg && <> {syncMsg}</>}
+            </p>
+            <p style={{ fontSize: 13 }}>When this is on, a copy of your books is also kept in SeBook&rsquo;s private cloud so Muse and this app can see the same books. Turn it off any time to stop that.</p>
+          </div>
         </div>
 
         <div className="section">
