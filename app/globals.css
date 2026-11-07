@@ -206,6 +206,7 @@ a { color: inherit; text-decoration: none; }
 .charcard textarea { min-height: 92px; resize: vertical; }
 
 /* ---------- Insights column (right side of the open book) ---------- */
+.mvisuals { display: none; }
 .insights { padding: 26px 18px 40px 4px; position: sticky; top: 58px; max-height: calc(100vh - 58px); overflow-y: auto; }
 .inscard { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px 17px; margin-bottom: 14px; box-shadow: var(--shadow); }
 .inscard h3 { font-size: 11.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); display: flex; align-items: center; gap: 7px; margin-bottom: 10px; }
@@ -231,6 +232,11 @@ a { color: inherit; text-decoration: none; }
   .wlayout { grid-template-columns: 240px minmax(0, 1fr); }
   .insights { grid-column: 1 / -1; position: static; max-height: none; padding: 0 34px 60px; display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; align-items: start; }
   .insights .inscard { margin-bottom: 0; }
+  /* Read mode on tablet/phone: the insights column is replaced by the
+     condensed visual strip directly under the reading page. */
+  .mode-read .insights { display: none; }
+  .mvisuals { display: grid; grid-template-columns: 1fr; gap: 14px; max-width: 720px; margin: 22px auto 0; }
+  .mvisuals .inscard { margin-bottom: 0; }
 }
 @media (max-width: 860px) {
   .topbar .tag { display: none; }
@@ -267,7 +273,9 @@ a { color: inherit; text-decoration: none; }
   .page h2 { font-size: 27px; }
   .readbody { font-size: 17.5px; line-height: 1.85; }
   .editarea { padding: 20px; font-size: 17px; }
-  .toolbar { top: 118px; }
+  /* The toolbar sits in the normal flow on mobile instead of sticking
+     under the header, so it never overlaps a wrapped header row. */
+  .toolbar { position: static; }
   .insights { padding: 0 14px 50px; grid-template-columns: 1fr; }
   .segmented button .seg-label { display: none; }
   .segmented button { padding: 6px 10px; }
