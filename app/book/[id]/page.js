@@ -5,13 +5,14 @@ import {
   ArrowLeft, BookOpen, Pencil, Eye, Maximize, Minimize, Plus,
   ChevronUp, ChevronDown, Trash2, Download, Printer, FileText,
   Lightbulb, BarChart3, Target, Clock, Menu, X, ChevronLeft, ChevronRight,
-  PenLine, Map, Users, StickyNote, ListOrdered
+  PenLine, Map, Users, StickyNote, ListOrdered, Volume2, Play, Pause, Square
 } from "lucide-react";
 import {
   loadBooks, saveBooks, countWords, bookWordCount, readingMinutes,
-  getTodayWords, addTodayWords, bookToMarkdown, extractFacts,
+  getTodayWords, addTodayWords, bookToMarkdown, extractFacts, htmlToText,
   isIntegrationEnabled, pushBooksToCloud, pullBooksFromCloud
 } from "../../../lib/store";
+import { ReadAloud, VOICES, DEFAULT_VOICE } from "../../../lib/readAloud";
 
 function uid() {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
@@ -31,6 +32,17 @@ export default function BookPage() {
   const [today, setToday] = useState(0);
   const editorRef = useRef(null);
   const pushTimerRef = useRef(null);
+  // Read-aloud (Kokoro — a real open-source voice, not the system voice).
+  const readerRef = useRef(null);
+  const [listenState, setListenState] = useState("idle"); // idle | loading | reading | paused | done | error
+  const [listenDetail, setListenDetail] = useState("");
+  const [listenProg, setListenProg] = useState({ index: 0, total: 0, fraction: 0 });
+  const [voice, setVoice] = useState(() => {
+    try { return localStorage.getItem("sebook-voice") || DEFAULT_VOICE; } catch { return DEFAULT_VOICE; }
+  });
+  const [speed, setSpeed] = useState(() => {
+    try { return parseFloat(localStorage.getItem("sebook-speed") || "1") || 1; } catch { return 1; }
+  });
 
   useEffect(() => {
     const books = loadBooks();
@@ -185,6 +197,59 @@ export default function BookPage() {
 
   function exportMd() {
     download(`${book.title.replace(/[^\w\- ]/g, "") || "book"}.md`, bookToMarkdown(book), "text/markdown");
+  }
+
+  // Stop the voice when the chapter changes, when switching to Edit,
+  // or when leaving the page.
+  useEffect(() => {
+    stopListen();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chapterId, mode]);
+  useEffect(() => () => { try { readerRef.current?.stop(); } catch {} }, []);
+
+  function getReader() {
+    if (!readerRef.current) {
+      readerRef.current = new ReadAloud();
+      readerRef.current.setCallbacks({
+        onStatus: (s, detail) => { setListenState(s); setListenDetail(detail); },
+        onProgress: (p) => setListenProg(p)
+      });
+    }
+    return readerRef.current;
+  }
+
+  function startListen() {
+    if (!chapter) return;
+    const reader = getReader();
+    setListenState("loading");
+    setListenDetail("Starting the voice…");
+    reader.start(htmlToText(chapter.content || ""), { voice, speed });
+  }
+
+  function stopListen() {
+    try { readerRef.current?.stop(); } catch {}
+    setListenState("idle");
+    setListenDetail("");
+    setListenProg({ index: 0, total: 0, fraction: 0 });
+  }
+
+  function toggleListenPause() {
+    const reader = readerRef.current;
+    if (!reader) return;
+    if (listenState === "paused") reader.resume();
+    else reader.pause();
+  }
+
+  function changeVoice(v) {
+    setVoice(v);
+    try { localStorage.setItem("sebook-voice", v); } catch {}
+    readerRef.current?.setVoice(v);
+  }
+
+  function changeSpeed(n) {
+    setSpeed(n);
+    try { localStorage.setItem("sebook-speed", String(n)); } catch {}
+    readerRef.current?.setSpeed(n);
   }
 
   function goChapter(dir) {
@@ -352,6 +417,49 @@ export default function BookPage() {
 
           {!editing && chapter && (
             <>
+              <div className="listenbar no-print">
+                {listenState === "idle" ? (
+                  <>
+                    <button className="btn btn-dark" onClick={startListen}>
+                      <Volume2 size={16} /> Listen to this chapter
+                    </button>
+                    <span className="listen-note">Read aloud by a real voice (Kokoro, open source) — not the phone&rsquo;s robot voice. First listen downloads the voice once (about 80 MB), then it plays instantly.</span>
+                  </>
+                ) : (
+                  <div className="listen-controls">
+                    <button className="btn btn-dark" onClick={toggleListenPause} disabled={listenState === "loading" || listenState === "error"}>
+                      {listenState === "paused" ? <><Play size={15} /> Resume</> : <><Pause size={15} /> Pause</>}
+                    </button>
+                    <button className="btn btn-light" onClick={stopListen}><Square size={14} /> Stop</button>
+                    <div className="listen-mid">
+                      <div className="listen-status">{listenDetail || "Reading…"}</div>
+                      {listenProg.total > 0 && (
+                        <>
+                          <div className="lprog"><i style={{ width: Math.round(listenProg.fraction * 100) + "%" }} /></div>
+                          <div className="listen-status">Part {Math.min(listenProg.index + 1, listenProg.total)} of {listenProg.total}</div>
+                        </>
+                      )}
+                    </div>
+                    <label className="listen-pick">
+                      Voice
+                      <select value={voice} onChange={(e) => changeVoice(e.target.value)}>
+                        {VOICES.map((v) => (
+                          <option key={v.id} value={v.id}>{v.label} — {v.desc}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="listen-pick">
+                      Speed
+                      <select value={String(speed)} onChange={(e) => changeSpeed(parseFloat(e.target.value))}>
+                        <option value="0.75">0.75×</option>
+                        <option value="1">1×</option>
+                        <option value="1.25">1.25×</option>
+                        <option value="1.5">1.5×</option>
+                      </select>
+                    </label>
+                  </div>
+                )}
+              </div>
               <article className="page">
                 <div className="kicker">{book.typeName} · Chapter {chapterIndex + 1} of {(book.chapters || []).length}</div>
                 <h2>{chapter.title}</h2>
