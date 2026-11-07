@@ -1,15 +1,18 @@
 // SeBook read-aloud, server voice (Microsoft Edge read-aloud service).
-// The voice is generated on the server through the free Edge TTS service
-// (no key, no account) and streamed back as MP3, so the phone does no
-// heavy work at all: no big download, no warming up a model in the
-// browser, and the first sound starts in seconds. It needs internet
-// every time it reads, which the user accepted.
+// The voice is generated on the server through Microsoft's free
+// read-aloud voices (no key, no account) and streamed back as MP3, so
+// the phone does no heavy work at all: no big download, no warming up
+// a model in the browser, and the first sound starts in seconds. It
+// needs internet every time it reads, which the user accepted.
 //
-// The service is unofficial (Microsoft's own read-aloud endpoint, used
-// here through the small `edge-tts` library). If Microsoft ever changes
-// it, this route returns a 502 and the player shows a clear error.
+// The synthesis client is our own small implementation in
+// lib/edgeTts.js, following the maintained andresayac/edge-tts
+// protocol against Microsoft's current endpoint
+// (api.msedgeservices.com). The old `edge-tts` npm package was
+// dropped: it talks to the retired speech.platform.bing.com endpoint,
+// which started refusing handshakes with HTTP 403 in 2026.
 
-import { tts } from "edge-tts/out/index.js";
+import { synthesizeEdgeTts } from "../../../lib/edgeTts";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -37,7 +40,7 @@ export async function POST(req) {
     return Response.json({ error: "Unknown voice." }, { status: 400 });
   }
   try {
-    const audio = await tts(text, { voice });
+    const audio = await synthesizeEdgeTts(text, voice);
     return new Response(audio, {
       status: 200,
       headers: {
