@@ -3,7 +3,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import {
   loadBooks, saveBooks, countWords, bookWordCount, readingMinutes,
-  getTodayWords, addTodayWords, bookToMarkdown
+  getTodayWords, addTodayWords, bookToMarkdown,
+  isIntegrationEnabled, pushBooksToCloud, pullBooksFromCloud
 } from "../../../lib/store";
 
 function uid() {
@@ -22,6 +23,7 @@ export default function BookPage() {
   const [today, setToday] = useState(0);
   const editorRef = useRef(null);
   const lastCountRef = useRef(0);
+  const pushTimerRef = useRef(null);
 
   useEffect(() => {
     const books = loadBooks();
@@ -31,6 +33,14 @@ export default function BookPage() {
     setChapterId(found.chapters?.[0]?.id || null);
     lastCountRef.current = bookWordCount(found);
     setToday(getTodayWords());
+    if (isIntegrationEnabled()) {
+      pullBooksFromCloud().then((r) => {
+        if (r.changed) {
+          const fresh = loadBooks().find((b) => b.id === params.id);
+          if (fresh) setBook(fresh);
+        }
+      }).catch(() => {});
+    }
   }, [params.id]);
 
   const chapter = useMemo(
@@ -46,6 +56,14 @@ export default function BookPage() {
     const books = loadBooks().map((b) => (b.id === next.id ? next : b));
     saveBooks(books);
     setSavedAt(new Date());
+    // If the Muse Integration is on, sync the change to the cloud a
+    // couple of seconds after the writer stops typing.
+    if (isIntegrationEnabled()) {
+      if (pushTimerRef.current) clearTimeout(pushTimerRef.current);
+      pushTimerRef.current = setTimeout(() => {
+        pushBooksToCloud().catch(() => {});
+      }, 2000);
+    }
   }
 
   function updateBook(fn) {
