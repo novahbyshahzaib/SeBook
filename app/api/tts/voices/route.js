@@ -3,8 +3,13 @@
 // available (300+ voices). Cached in memory and at the edge for a day.
 // If the live list cannot be reached, a curated fallback list is served
 // so Listen never breaks because of the list alone.
+//
+// The list itself is a plain HTTPS GET (no WebSocket, no token dance),
+// so it needs no library — unlike synthesis, which uses our own client
+// in lib/edgeTts.js against the current endpoint.
 
-import { getVoices } from "edge-tts/out/index.js";
+const VOICES_URL =
+  "https://speech.platform.bing.com/consumer/speech/synthesize/readaloud/voices/list?trustedclienttoken=6A5AA1D4EAFF4E9FB37E23D68491D6F4";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -51,6 +56,12 @@ function clean(list) {
       Gender: v.Gender || "",
       Locale: v.Locale
     }));
+}
+
+async function getVoices() {
+  const res = await fetch(VOICES_URL, { signal: AbortSignal.timeout(10000) });
+  if (!res.ok) throw new Error(`Voice list returned ${res.status}`);
+  return await res.json();
 }
 
 export async function GET() {
