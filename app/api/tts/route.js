@@ -49,9 +49,9 @@ export async function POST(req) {
       }
     });
   } catch (err) {
-    console.error("Edge TTS failed:", err?.message || err);
+    console.error("Edge TTS failed:", err?.message || err, err?.trace || "");
     return Response.json(
-      { error: "The read-aloud service did not answer. Check your connection and try again.", detail: String(err?.message || err) },
+      { error: "The read-aloud service did not answer. Check your connection and try again.", detail: `${err?.message || err}${err?.trace ? ` [${err.trace}]` : ""}` },
       { status: 502 }
     );
   }
