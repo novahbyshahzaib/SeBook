@@ -26,6 +26,30 @@ own starter chapters and structure.
 - **Export** — download as text or Markdown, or print to PDF
 - **Autosave** — every word is saved on your device as you type
 
+## Muse Integration
+
+SeBook can be controlled by Muse from chat:
+
+1. Open SeBook, find **Muse Integration** on the library page.
+2. Tap **Generate my key** and copy the key.
+3. Give the key to Muse in chat (paste it when you ask Muse to write).
+4. Then say things like “write Chapter 2 of my book” — Muse writes through
+   `/api/integration/write` into the cloud copy, and the app picks it up
+   next time it opens (or on Sync now).
+
+Your books are also kept in SeBook's cloud (Vercel Blob, one file per key)
+while the integration is on, so the app and Muse see the same books. Turn
+it off any time to stop syncing. The key is the only protection — keep it
+private like a password, and remove it in the app if it ever leaks.
+
+API (all calls need the key):
+
+- `GET /api/integration/books?key=sb_...` — read the cloud books
+- `POST /api/integration/books` — replace the cloud books
+- `POST /api/integration/write` — actions: `list_books`, `get_book`,
+  `create_book`, `create_chapter`, `append_chapter`, `set_chapter`,
+  `set_title`, `add_character`
+
 ## How it works
 
 Your books are saved in your own browser (local storage), so your writing
