@@ -2,8 +2,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import {
+  ArrowLeft, BookOpen, Pencil, Eye, Maximize, Minimize, Plus,
+  ChevronUp, ChevronDown, Trash2, Download, Printer, FileText,
+  Lightbulb, BarChart3, Target, Clock, Menu, X, ChevronLeft, ChevronRight,
+  PenLine, Map, Users, StickyNote, ListOrdered
+} from "lucide-react";
+import {
   loadBooks, saveBooks, countWords, bookWordCount, readingMinutes,
-  getTodayWords, addTodayWords, bookToMarkdown,
+  getTodayWords, addTodayWords, bookToMarkdown, extractFacts,
   isIntegrationEnabled, pushBooksToCloud, pullBooksFromCloud
 } from "../../../lib/store";
 
@@ -17,12 +23,13 @@ export default function BookPage() {
   const [book, setBook] = useState(null);
   const [chapterId, setChapterId] = useState(null);
   const [tab, setTab] = useState("write");
+  const [mode, setMode] = useState("read");
   const [focus, setFocus] = useState(false);
+  const [navOpen, setNavOpen] = useState(false);
   const [savedAt, setSavedAt] = useState(null);
   const [search, setSearch] = useState("");
   const [today, setToday] = useState(0);
   const editorRef = useRef(null);
-  const lastCountRef = useRef(0);
   const pushTimerRef = useRef(null);
 
   useEffect(() => {
@@ -31,7 +38,6 @@ export default function BookPage() {
     if (!found) { router.push("/"); return; }
     setBook(found);
     setChapterId(found.chapters?.[0]?.id || null);
-    lastCountRef.current = bookWordCount(found);
     setToday(getTodayWords());
     if (isIntegrationEnabled()) {
       pullBooksFromCloud().then((r) => {
@@ -47,8 +53,13 @@ export default function BookPage() {
     () => (book?.chapters || []).find((c) => c.id === chapterId) || null,
     [book, chapterId]
   );
+  const chapterIndex = (book?.chapters || []).findIndex((c) => c.id === chapterId);
   const totalWords = book ? bookWordCount(book) : 0;
   const chapterWords = chapter ? countWords(chapter.content || "") : 0;
+  const facts = useMemo(() => extractFacts(chapter?.content || ""), [chapter]);
+  const maxChapterWords = Math.max(1, ...(book?.chapters || []).map((c) => countWords(c.content || "")));
+  const progressPct = totalWords > 0 ? Math.round((chapterWords / totalWords) * 100) : 0;
+  const goalPct = Math.min(100, Math.round((today / (book?.goal || 500)) * 100));
 
   function persist(next) {
     next.updatedAt = Date.now();
@@ -56,8 +67,6 @@ export default function BookPage() {
     const books = loadBooks().map((b) => (b.id === next.id ? next : b));
     saveBooks(books);
     setSavedAt(new Date());
-    // If the Muse Integration is on, sync the change to the cloud a
-    // couple of seconds after the writer stops typing.
     if (isIntegrationEnabled()) {
       if (pushTimerRef.current) clearTimeout(pushTimerRef.current);
       pushTimerRef.current = setTimeout(() => {
@@ -178,6 +187,12 @@ export default function BookPage() {
     download(`${book.title.replace(/[^\w\- ]/g, "") || "book"}.md`, bookToMarkdown(book), "text/markdown");
   }
 
+  function goChapter(dir) {
+    const list = book?.chapters || [];
+    const next = list[chapterIndex + dir];
+    if (next) { setChapterId(next.id); window.scrollTo({ top: 0 }); }
+  }
+
   const searchHits = useMemo(() => {
     if (!search.trim() || !book) return [];
     const q = search.toLowerCase();
@@ -188,90 +203,148 @@ export default function BookPage() {
 
   if (!book) return <div style={{ padding: 40, fontStyle: "italic" }}>Opening your book…</div>;
 
-  const goalPct = Math.min(100, Math.round((today / (book.goal || 500)) * 100));
+  const editing = mode === "edit";
 
   return (
     <div>
-      <header className="topbar no-print">
-        <button onClick={() => router.push("/")} style={{ background: "none", border: "1px solid #57534e", color: "#faf7f2", padding: "8px 14px", borderRadius: 999 }}>← Library</button>
-        <div>
-          <div style={{ fontSize: 19, fontWeight: "bold" }}>{book.title}</div>
-          <div style={{ fontSize: 12, color: "#d6d3d1" }}>{book.typeName} • by {book.author} • {totalWords.toLocaleString()} words • ~{readingMinutes(totalWords)} min read</div>
+      <header className="wtop">
+        <button className="navtoggle" onClick={() => setNavOpen(true)}><Menu size={16} /> Chapters</button>
+        <button className="back" onClick={() => router.push("/")}><ArrowLeft size={15} /> Library</button>
+        <div className="title">
+          <h1>{book.title}</h1>
+          <div className="meta">{book.typeName} · by {book.author} · {totalWords.toLocaleString()} words · ~{readingMinutes(totalWords)} min</div>
         </div>
         <div className="spacer" />
-        <span style={{ fontSize: 13, color: savedAt ? "#a7f3d0" : "#d6d3d1" }}>{savedAt ? `Saved ${savedAt.toLocaleTimeString()}` : "Autosave on"}</span>
-        <button onClick={() => setFocus(!focus)}>{focus ? "Exit Focus" : "Focus Mode"}</button>
+        {savedAt && <span className="saved">Saved {savedAt.toLocaleTimeString()}</span>}
+        <div className="segmented">
+          <button className={mode === "read" ? "active" : ""} onClick={() => setMode("read")}>
+            <Eye size={14} /> <span className="seg-label">Read</span>
+          </button>
+          <button className={mode === "edit" ? "active" : ""} onClick={() => setMode("edit")}>
+            <Pencil size={14} /> <span className="seg-label">Edit</span>
+          </button>
+        </div>
+        <button className="back" onClick={() => setFocus(!focus)}>
+          {focus ? <Minimize size={15} /> : <Maximize size={15} />} {focus ? "Exit" : "Focus"}
+        </button>
       </header>
 
-      <div className="workspace">
+      {navOpen && <div className="scrim" onClick={() => setNavOpen(false)} />}
+
+      <div className="wlayout">
         {!focus && (
-          <aside className="side no-print">
+          <aside className={"side" + (navOpen ? " open" : "")}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+              <span style={{ fontFamily: "var(--font-display)", fontWeight: 600, fontSize: 17 }}>Contents</span>
+              <button className="iconbtn close" onClick={() => setNavOpen(false)}><X size={14} /> Close</button>
+            </div>
             <input className="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search this book…" />
             {search.trim() ? (
               <div>
-                <div className="sidehead">Found in {searchHits.length} chapter(s)</div>
+                <div className="sidehead">Found in {searchHits.length} chapter{searchHits.length === 1 ? "" : "s"}</div>
                 {searchHits.map((c) => (
-                  <div key={c.id} className="chap" onClick={() => { setChapterId(c.id); setSearch(""); setTab("write"); }}>{c.title}</div>
+                  <div key={c.id} className="chap" onClick={() => { setChapterId(c.id); setSearch(""); setNavOpen(false); }}>
+                    <span>{c.title}</span>
+                  </div>
                 ))}
                 {searchHits.length === 0 && <div className="sidehead">Nothing found.</div>}
               </div>
             ) : (
               <>
-                <div className="sidehead">Chapters</div>
+                <div className="sidehead"><span>Chapters</span><span>{(book.chapters || []).length}</span></div>
                 {(book.chapters || []).map((c) => (
-                  <div key={c.id} className={"chap" + (c.id === chapterId ? " active" : "")} onClick={() => { setChapterId(c.id); setTab("write"); }}>
+                  <div key={c.id} className={"chap" + (c.id === chapterId ? " active" : "")} onClick={() => { setChapterId(c.id); setNavOpen(false); }}>
                     <span>{c.title}</span>
-                    <span className="chapwords">{countWords(c.content || "").toLocaleString()}w</span>
+                    <span className="cw">{countWords(c.content || "").toLocaleString()}w</span>
                   </div>
                 ))}
-                <button className="addchap" onClick={addChapter}>+ Add chapter</button>
-                <div className="sidehead" style={{ marginTop: 18 }}>Daily goal</div>
-                <div className="goalmini">
-                  <div>{today} / {book.goal || 500} words today — {goalPct}%</div>
-                  <div className="goalbar" style={{ background: "#e8e2d9", marginTop: 6 }}><i style={{ width: goalPct + "%", background: "#b45309" }} /></div>
-                  <label style={{ fontSize: 12, color: "#6b645c" }}>Goal (words/day)
-                    <input type="number" value={book.goal || 500} min="50" step="50" style={{ width: "100%", padding: 8, marginTop: 4, borderRadius: 8, border: "1px solid #e8e2d9" }}
-                      onChange={(e) => updateBook((n) => { n.goal = parseInt(e.target.value || "500", 10); })} />
-                  </label>
+                {editing && <button className="addchap" onClick={addChapter}><Plus size={15} /> Add chapter</button>}
+
+                <div className="sidehead">Daily goal</div>
+                <div className="sidecard">
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <b>{today} / {book.goal || 500} words</b><span>{goalPct}%</span>
+                  </div>
+                  <div className="prog"><i style={{ width: goalPct + "%" }} /></div>
+                  {editing ? (
+                    <div className="row" style={{ marginTop: 8 }}>
+                      <span>Goal (words/day)</span>
+                      <input type="number" value={book.goal || 500} min="50" step="50" style={{ width: 84, padding: "6px 8px", borderRadius: 8, border: "1px solid var(--line)" }}
+                        onChange={(e) => updateBook((n) => { n.goal = parseInt(e.target.value || "500", 10); })} />
+                    </div>
+                  ) : (
+                    <div className="row"><span>Today&rsquo;s goal</span><b>{book.goal || 500} words</b></div>
+                  )}
                 </div>
-                <div className="sidehead" style={{ marginTop: 18 }}>Export</div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  <button className="toolbtn" onClick={exportTxt}>Download as Text (.txt)</button>
-                  <button className="toolbtn" onClick={exportMd}>Download as Markdown (.md)</button>
-                  <button className="toolbtn" onClick={() => window.print()}>Print / Save as PDF</button>
+
+                <div className="sidehead">Export</div>
+                <div className="exportbtns">
+                  <button className="iconbtn" onClick={exportTxt}><Download size={14} /> Text (.txt)</button>
+                  <button className="iconbtn" onClick={exportMd}><FileText size={14} /> Markdown (.md)</button>
+                  <button className="iconbtn" onClick={() => window.print()}><Printer size={14} /> Print / Save as PDF</button>
                 </div>
               </>
             )}
           </aside>
         )}
 
-        <main className="editor">
-          <div className="tabs no-print">
-            {["write", "outline", "characters", "notes"].map((t) => (
-              <button key={t} className={tab === t ? "active" : ""} onClick={() => setTab(t)}>
-                {t === "write" ? "✍️ Write" : t === "outline" ? "🗺️ Outline" : t === "characters" ? "👥 Characters" : "📝 Notes"}
-              </button>
-            ))}
-            <span className="tabmeta">{chapterWords.toLocaleString()} words in this chapter</span>
-          </div>
+        <main className="maincol">
+          {editing && (
+            <div className="tabs no-print">
+              {[
+                { id: "write", label: "Write", icon: PenLine },
+                { id: "outline", label: "Outline", icon: Map },
+                { id: "characters", label: "Characters", icon: Users },
+                { id: "notes", label: "Notes", icon: StickyNote }
+              ].map((t) => (
+                <button key={t.id} className={tab === t.id ? "active" : ""} onClick={() => setTab(t.id)}>
+                  <t.icon size={14} /> {t.label}
+                </button>
+              ))}
+              <span className="tabmeta">{chapterWords.toLocaleString()} words in this chapter</span>
+            </div>
+          )}
 
-          {tab === "write" && chapter && (
+          {!editing && chapter && (
+            <>
+              <article className="page">
+                <div className="kicker">{book.typeName} · Chapter {chapterIndex + 1} of {(book.chapters || []).length}</div>
+                <h2>{chapter.title}</h2>
+                <div className="byline">{book.title} — by {book.author}</div>
+                <div className="ornament">✦</div>
+                <div className="readbody" dangerouslySetInnerHTML={{ __html: chapter.content || "<p>This chapter is empty. Switch to Edit to write it.</p>" }} />
+              </article>
+              <div className="pager no-print">
+                <button className="btn btn-light" disabled={chapterIndex <= 0} onClick={() => goChapter(-1)}>
+                  <ChevronLeft size={15} /> Previous
+                </button>
+                <button className="btn btn-dark" disabled={chapterIndex >= (book.chapters || []).length - 1} onClick={() => goChapter(1)}>
+                  Next <ChevronRight size={15} />
+                </button>
+              </div>
+            </>
+          )}
+
+          {editing && tab === "write" && chapter && (
             <>
               <div className="chaptitle no-print">
-                <input value={chapter.title} onChange={(e) => renameChapter(chapter.id, e.target.value)} />
-                <button onClick={() => moveChapter(chapter.id, -1)} title="Move up">↑</button>
-                <button onClick={() => moveChapter(chapter.id, 1)} title="Move down">↓</button>
-                <button onClick={() => deleteChapter(chapter.id)} title="Delete chapter" style={{ color: "#b91c1c" }}>Delete</button>
+                <input className="input" value={chapter.title} onChange={(e) => renameChapter(chapter.id, e.target.value)} />
+                <button className="iconbtn" onClick={() => moveChapter(chapter.id, -1)} title="Move up"><ChevronUp size={15} /></button>
+                <button className="iconbtn" onClick={() => moveChapter(chapter.id, 1)} title="Move down"><ChevronDown size={15} /></button>
+                <button className="iconbtn danger" onClick={() => deleteChapter(chapter.id)} title="Delete chapter"><Trash2 size={15} /></button>
               </div>
               <div className="toolbar no-print">
-                <button onClick={() => exec("bold")}><b>B</b></button>
-                <button onClick={() => exec("italic")}><i>I</i></button>
-                <button onClick={() => exec("underline")}><u>U</u></button>
+                <button onClick={() => exec("bold")} title="Bold"><b>B</b></button>
+                <button onClick={() => exec("italic")} title="Italic"><i>I</i></button>
+                <button onClick={() => exec("underline")} title="Underline"><u>U</u></button>
+                <span className="sep" />
                 <button onClick={() => exec("formatBlock", "h1")}>H1</button>
                 <button onClick={() => exec("formatBlock", "h2")}>H2</button>
-                <button onClick={() => exec("insertUnorderedList")}>• List</button>
-                <button onClick={() => exec("insertOrderedList")}>1. List</button>
-                <button onClick={() => exec("formatBlock", "blockquote")}>❝ Quote</button>
+                <span className="sep" />
+                <button onClick={() => exec("insertUnorderedList")}>Bullet list</button>
+                <button onClick={() => exec("insertOrderedList")}>Numbered list</button>
+                <button onClick={() => exec("formatBlock", "blockquote")}>Quote</button>
+                <span className="sep" />
                 <button onClick={() => exec("removeFormat")}>Clear format</button>
               </div>
               <div
@@ -283,16 +356,16 @@ export default function BookPage() {
                 onInput={onEditorInput}
                 dangerouslySetInnerHTML={{ __html: chapter.content || "" }}
               />
-              <p className="hint no-print">Tip: everything saves automatically as you type. Use Focus Mode to hide everything else and just write.</p>
+              <p className="hint no-print">Everything saves automatically as you type. Switch back to Read to see the finished page.</p>
             </>
           )}
 
-          {tab === "outline" && (
+          {editing && tab === "outline" && (
             <div className="panel">
               <h2>Outline — {chapter?.title || "no chapter"}</h2>
               <p>What happens in this chapter? Write the beats of the story here.</p>
-              <textarea value={chapter?.outline || ""} onChange={(e) => setOutline(e.target.value)} placeholder="1. …&#10;2. …&#10;3. …" />
-              <h3 style={{ marginTop: 20 }}>All chapters at a glance</h3>
+              <textarea value={chapter?.outline || ""} onChange={(e) => setOutline(e.target.value)} placeholder={"1. …\n2. …\n3. …"} />
+              <h3 style={{ marginTop: 22, fontFamily: "var(--font-display)", fontSize: 19 }}>All chapters at a glance</h3>
               {(book.chapters || []).map((c) => (
                 <div key={c.id} className="outlineRow" onClick={() => setChapterId(c.id)}>
                   <b>{c.title}</b>
@@ -302,26 +375,26 @@ export default function BookPage() {
             </div>
           )}
 
-          {tab === "characters" && (
+          {editing && tab === "characters" && (
             <div className="panel">
               <h2>Characters</h2>
               <p>Keep every person in your book in one place.</p>
-              <button className="toolbtn" onClick={addCharacter} style={{ margin: "10px 0 16px" }}>+ Add character</button>
-              {(book.characters || []).length === 0 && <p style={{ color: "#6b645c", fontStyle: "italic" }}>No characters yet.</p>}
+              <button className="btn btn-bronze btn-sm" onClick={addCharacter} style={{ margin: "10px 0 16px" }}><Plus size={14} /> Add character</button>
+              {(book.characters || []).length === 0 && <p style={{ color: "var(--muted)", fontStyle: "italic" }}>No characters yet.</p>}
               <div className="chgrid">
                 {(book.characters || []).map((c) => (
                   <div key={c.id} className="charcard">
-                    <input value={c.name} onChange={(e) => updateCharacter(c.id, "name", e.target.value)} placeholder="Name" style={{ fontWeight: "bold", fontSize: 17 }} />
+                    <input value={c.name} onChange={(e) => updateCharacter(c.id, "name", e.target.value)} placeholder="Name" style={{ fontWeight: "bold", fontSize: 16 }} />
                     <input value={c.role} onChange={(e) => updateCharacter(c.id, "role", e.target.value)} placeholder="Role (hero, villain, friend…)" />
                     <textarea value={c.desc} onChange={(e) => updateCharacter(c.id, "desc", e.target.value)} placeholder="Who are they? What do they want? What are they afraid of?" />
-                    <button onClick={() => deleteCharacter(c.id)} style={{ color: "#b91c1c", background: "none", border: "none", alignSelf: "flex-start" }}>Remove</button>
+                    <button onClick={() => deleteCharacter(c.id)} style={{ color: "var(--red)", background: "none", border: "none", alignSelf: "flex-start", fontSize: 13, fontWeight: 600 }}>Remove</button>
                   </div>
                 ))}
               </div>
             </div>
           )}
 
-          {tab === "notes" && (
+          {editing && tab === "notes" && (
             <div className="panel">
               <h2>Research &amp; notes</h2>
               <p>Facts, ideas, links and scraps for this book. Everything you gather while writing.</p>
@@ -329,55 +402,55 @@ export default function BookPage() {
             </div>
           )}
         </main>
-      </div>
 
-      <style jsx>{`
-        .workspace { display: flex; max-width: 1200px; margin: 0 auto; min-height: 70vh; }
-        .side { width: 280px; flex-shrink: 0; padding: 20px 16px; border-right: 1px solid var(--line); }
-        .search { width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; font-size: 14px; background: #fff; }
-        .sidehead { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin: 16px 0 8px; }
-        .chap { display: flex; justify-content: space-between; gap: 8px; padding: 9px 10px; border-radius: 8px; cursor: pointer; font-size: 14.5px; }
-        .chap:hover { background: #f1ebe1; }
-        .chap.active { background: var(--accent-soft); font-weight: bold; }
-        .chapwords { color: var(--muted); font-size: 12px; white-space: nowrap; }
-        .addchap { width: 100%; margin-top: 10px; padding: 9px; border: 1px dashed var(--line); background: none; border-radius: 10px; color: var(--accent); font-weight: bold; }
-        .goalmini { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 12px; font-size: 13.5px; }
-        .toolbtn { background: #fff; border: 1px solid var(--line); padding: 9px 12px; border-radius: 10px; text-align: left; font-size: 14px; }
-        .toolbtn:hover { border-color: var(--accent); }
-        .editor { flex: 1; padding: 20px 28px 60px; min-width: 0; }
-        .tabs { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
-        .tabs button { background: none; border: 1px solid var(--line); padding: 8px 14px; border-radius: 999px; font-size: 14px; }
-        .tabs button.active { background: #1c1a17; color: #faf7f2; border-color: #1c1a17; }
-        .tabmeta { margin-left: auto; color: var(--muted); font-size: 13px; font-style: italic; }
-        .chaptitle { display: flex; gap: 8px; margin-bottom: 12px; }
-        .chaptitle input { flex: 1; font-size: 24px; font-weight: bold; border: none; background: transparent; border-bottom: 2px solid var(--line); padding: 4px 2px; }
-        .chaptitle input:focus { outline: none; border-color: var(--accent); }
-        .chaptitle button { background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 4px 10px; }
-        .toolbar { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
-        .toolbar button { background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 7px 11px; font-size: 14px; }
-        .toolbar button:hover { border-color: var(--accent); }
-        .editarea { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 28px 30px; min-height: 55vh; font-size: 18px; line-height: 1.85; outline: none; }
-        .editarea h1 { font-size: 30px; margin: 10px 0; }
-        .editarea h2 { font-size: 24px; margin: 10px 0; }
-        .editarea blockquote { border-left: 3px solid var(--accent); margin: 12px 0; padding-left: 14px; font-style: italic; color: var(--muted); }
-        .hint { color: var(--muted); font-size: 13px; font-style: italic; margin-top: 10px; }
-        .panel h2 { font-size: 24px; margin-bottom: 4px; }
-        .panel p { color: var(--muted); font-size: 14px; margin-bottom: 10px; }
-        .panel textarea { width: 100%; min-height: 160px; padding: 14px; border: 1px solid var(--line); border-radius: 12px; font-size: 15px; line-height: 1.7; background: #fff; }
-        .outlineRow { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin-top: 8px; cursor: pointer; }
-        .outlineRow b { display: block; margin-bottom: 2px; }
-        .outlineRow span { color: var(--muted); font-size: 13.5px; }
-        .chgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; }
-        .charcard { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 8px; }
-        .charcard input, .charcard textarea { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 14px; width: 100%; }
-        .charcard textarea { min-height: 90px; }
-        @media (max-width: 760px) {
-          .workspace { flex-direction: column; }
-          .side { width: 100%; border-right: none; border-bottom: 1px solid var(--line); }
-          .editor { padding: 16px; }
-          .editarea { padding: 18px; font-size: 16px; }
-        }
-      `}</style>
+        {!focus && chapter && (
+          <aside className="insights">
+            <div className="inscard factcard">
+              <h3><Lightbulb size={14} /> The fact hidden in this chapter</h3>
+              {facts.length > 0 ? (
+                facts.map((f, i) => <p key={i}>{f}</p>)
+              ) : (
+                <p>Every chapter of this book hides one true fact inside the story. This chapter does not have one yet — write one in, and it will appear here.</p>
+              )}
+              <div className="src">From “{chapter.title}” — story first, fact inside.</div>
+            </div>
+
+            <div className="inscard">
+              <h3><BarChart3 size={14} /> Chapter lengths</h3>
+              <div className="chartbar">
+                {(book.chapters || []).map((c) => {
+                  const w = countWords(c.content || "");
+                  return (
+                    <div key={c.id} className={"col" + (c.id === chapterId ? " cur" : "")} onClick={() => setChapterId(c.id)} style={{ cursor: "pointer" }} title={`${c.title} — ${w.toLocaleString()} words`}>
+                      <div className="bar" style={{ height: Math.max(6, Math.round((w / maxChapterWords) * 64)) + "px" }} />
+                      <div className="clbl">{c.title.replace(/^Chapter \d+ — /, "").slice(0, 10) || "Ch"}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="inscard">
+              <h3><Target size={14} /> Reading this book</h3>
+              <div className="kv"><span>This chapter</span><b>{chapterWords.toLocaleString()} words</b></div>
+              <div className="kv"><span>Whole book</span><b>{totalWords.toLocaleString()} words</b></div>
+              <div className="kv"><span>Reading time left</span><b>~{readingMinutes(totalWords - chapterWords)} min</b></div>
+              <div className="kv"><span>Chapter progress</span><b>{progressPct}% of the book</b></div>
+              <div className="prog"><i style={{ width: progressPct + "%" }} /></div>
+              <div className="kv" style={{ marginTop: 8 }}><span><Clock size={13} /> Today&rsquo;s goal</span><b>{today} / {book.goal || 500} words</b></div>
+            </div>
+
+            <div className="inscard">
+              <h3><ListOrdered size={14} /> In this book</h3>
+              {(book.chapters || []).map((c, i) => (
+                <div key={c.id} className="kv" onClick={() => setChapterId(c.id)} style={{ cursor: "pointer" }}>
+                  <span>{i + 1}. {c.title}</span><b>{countWords(c.content || "").toLocaleString()}w</b>
+                </div>
+              ))}
+            </div>
+          </aside>
+        )}
+      </div>
     </div>
   );
 }
