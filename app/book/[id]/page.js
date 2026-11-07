@@ -423,7 +423,7 @@ export default function BookPage() {
                     <button className="btn btn-dark" onClick={startListen}>
                       <Volume2 size={16} /> Listen to this chapter
                     </button>
-                    <span className="listen-note">Read aloud by a real voice (Kokoro, open source) — not the phone&rsquo;s robot voice. First listen downloads the voice once (about 45 MB), then it plays instantly.</span>
+                    <span className="listen-note">Read aloud by a real voice (Kokoro, open source) — not the phone&rsquo;s robot voice. The first listen downloads the voice once (about 45 MB) and warms it up, which takes a few minutes the first time. After that it starts quickly.</span>
                   </>
                 ) : (
                   <div className="listen-controls">
