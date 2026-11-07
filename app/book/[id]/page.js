@@ -12,7 +12,7 @@ import {
   getTodayWords, addTodayWords, bookToMarkdown, extractFacts, htmlToText,
   isIntegrationEnabled, pushBooksToCloud, pullBooksFromCloud
 } from "../../../lib/store";
-import { ReadAloud, VOICES, DEFAULT_VOICE } from "../../../lib/readAloud";
+import { ReadAloud, VOICES, DEFAULT_VOICE, fetchVoices, voiceLabel } from "../../../lib/readAloud";
 
 function uid() {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
@@ -32,13 +32,22 @@ export default function BookPage() {
   const [today, setToday] = useState(0);
   const editorRef = useRef(null);
   const pushTimerRef = useRef(null);
-  // Read-aloud (Kokoro — a real open-source voice, not the system voice).
+  // Read-aloud — a real, natural server voice (Microsoft's free
+  // read-aloud voices), not the phone's robot voice. No download;
+  // it needs internet every time it reads.
   const readerRef = useRef(null);
   const [listenState, setListenState] = useState("idle"); // idle | loading | reading | paused | done | error
   const [listenDetail, setListenDetail] = useState("");
   const [listenProg, setListenProg] = useState({ index: 0, total: 0, fraction: 0 });
+  const [voiceList, setVoiceList] = useState(VOICES); // full live list loads in the background
+  const [voiceSearch, setVoiceSearch] = useState("");
   const [voice, setVoice] = useState(() => {
-    try { return localStorage.getItem("sebook-voice") || DEFAULT_VOICE; } catch { return DEFAULT_VOICE; }
+    try {
+      const saved = localStorage.getItem("sebook-voice") || "";
+      // An old Kokoro voice id (af_heart…) is not a server voice;
+      // fall back to the default when the saved value is not one.
+      return /^[a-z]{2,3}-[A-Z]{2}-[A-Za-z]+Neural$/.test(saved) ? saved : DEFAULT_VOICE;
+    } catch { return DEFAULT_VOICE; }
   });
   const [speed, setSpeed] = useState(() => {
     try { return parseFloat(localStorage.getItem("sebook-speed") || "1") || 1; } catch { return 1; }
@@ -197,6 +206,34 @@ export default function BookPage() {
 
   function exportMd() {
     download(`${book.title.replace(/[^\w\- ]/g, "") || "book"}.md`, bookToMarkdown(book), "text/markdown");
+  }
+
+  // Load the full live voice list (300+ free voices) once, in the
+  // background, so the picker offers everything available.
+  useEffect(() => {
+    let alive = true;
+    fetchVoices().then((list) => { if (alive && Array.isArray(list) && list.length > 0) setVoiceList(list); }).catch(() => {});
+    return () => { alive = false; };
+  }, []);
+
+  // Voices grouped by language for the picker, English first, filtered
+  // by the search box (name, language or male/female).
+  function voiceGroups() {
+    const q = voiceSearch.trim().toLowerCase();
+    const filtered = voiceList.filter((v) => {
+      if (!q) return true;
+      return (v.FriendlyName + " " + v.Locale + " " + v.Gender).toLowerCase().includes(q);
+    });
+    const groups = {};
+    for (const v of filtered) {
+      const key = v.Locale || "Other";
+      (groups[key] = groups[key] || []).push(v);
+    }
+    const keys = Object.keys(groups).sort((a, b) => {
+      const ea = a.startsWith("en") ? 0 : 1, eb = b.startsWith("en") ? 0 : 1;
+      return ea - eb || a.localeCompare(b);
+    });
+    return keys.map((k) => ({ locale: k, voices: groups[k].sort((a, b) => a.FriendlyName.localeCompare(b.FriendlyName)) }));
   }
 
   // Stop the voice when the chapter changes, when switching to Edit,
@@ -423,7 +460,7 @@ export default function BookPage() {
                     <button className="btn btn-dark" onClick={startListen}>
                       <Volume2 size={16} /> Listen to this chapter
                     </button>
-                    <span className="listen-note">Read aloud by a real voice (Kokoro, open source) — not the phone&rsquo;s robot voice. The first listen downloads the voice once (about 45 MB) and warms it up, which takes a few minutes the first time. After that it starts quickly.</span>
+                    <span className="listen-note">Read aloud by a real, human-sounding voice — free server voices, no download, no sign-up. It needs internet every time it reads. Pick any voice below.</span>
                   </>
                 ) : (
                   <div className="listen-controls">
@@ -441,10 +478,21 @@ export default function BookPage() {
                       )}
                     </div>
                     <label className="listen-pick">
-                      Voice
+                      Voice ({voiceList.length})
+                      <input
+                        className="listen-search"
+                        type="search"
+                        placeholder="Search voices…"
+                        value={voiceSearch}
+                        onChange={(e) => setVoiceSearch(e.target.value)}
+                      />
                       <select value={voice} onChange={(e) => changeVoice(e.target.value)}>
-                        {VOICES.map((v) => (
-                          <option key={v.id} value={v.id}>{v.label} — {v.desc}</option>
+                        {voiceGroups().map((g) => (
+                          <optgroup key={g.locale} label={g.locale.replace("-", " ").toUpperCase()}>
+                            {g.voices.map((v) => (
+                              <option key={v.Name} value={v.Name}>{voiceLabel(v)}</option>
+                            ))}
+                          </optgroup>
                         ))}
                       </select>
                     </label>
