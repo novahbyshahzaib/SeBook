@@ -205,28 +205,73 @@ export default function BookPage() {
 
   const editing = mode === "edit";
 
+  // Shared visual cards: shown beside the page on desktop, and as a
+  // condensed strip under the page on mobile (read mode only).
+  const factCard = chapter ? (
+    <div className="inscard factcard">
+      <h3><Lightbulb size={14} /> The fact hidden in this chapter</h3>
+      {facts.length > 0 ? (
+        facts.map((f, i) => <p key={i}>{f}</p>)
+      ) : (
+        <p>Every chapter of this book hides one true fact inside the story. This chapter does not have one yet — write one in, and it will appear here.</p>
+      )}
+      <div className="src">From “{chapter.title}” — story first, fact inside.</div>
+    </div>
+  ) : null;
+
+  const chartCard = chapter ? (
+    <div className="inscard">
+      <h3><BarChart3 size={14} /> Chapter lengths</h3>
+      <div className="chartbar">
+        {(book.chapters || []).map((c) => {
+          const w = countWords(c.content || "");
+          return (
+            <div key={c.id} className={"col" + (c.id === chapterId ? " cur" : "")} onClick={() => setChapterId(c.id)} style={{ cursor: "pointer" }} title={`${c.title} — ${w.toLocaleString()} words`}>
+              <div className="bar" style={{ height: Math.max(6, Math.round((w / maxChapterWords) * 64)) + "px" }} />
+              <div className="clbl">{c.title.replace(/^Chapter \d+ — /, "").slice(0, 10) || "Ch"}</div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  ) : null;
+
   return (
-    <div>
+    <div className={editing ? "mode-edit" : "mode-read"}>
       <header className="wtop">
-        <button className="navtoggle" onClick={() => setNavOpen(true)}><Menu size={16} /> Chapters</button>
-        <button className="back" onClick={() => router.push("/")}><ArrowLeft size={15} /> Library</button>
-        <div className="title">
-          <h1>{book.title}</h1>
-          <div className="meta">{book.typeName} · by {book.author} · {totalWords.toLocaleString()} words · ~{readingMinutes(totalWords)} min</div>
-        </div>
-        <div className="spacer" />
-        {savedAt && <span className="saved">Saved {savedAt.toLocaleTimeString()}</span>}
-        <div className="segmented">
-          <button className={mode === "read" ? "active" : ""} onClick={() => setMode("read")}>
-            <Eye size={14} /> <span className="seg-label">Read</span>
-          </button>
-          <button className={mode === "edit" ? "active" : ""} onClick={() => setMode("edit")}>
-            <Pencil size={14} /> <span className="seg-label">Edit</span>
-          </button>
-        </div>
-        <button className="back" onClick={() => setFocus(!focus)}>
-          {focus ? <Minimize size={15} /> : <Maximize size={15} />} {focus ? "Exit" : "Focus"}
-        </button>
+        {editing ? (
+          <>
+            <button className="navtoggle" onClick={() => setNavOpen(true)}><Menu size={16} /> Chapters</button>
+            <button className="back" onClick={() => router.push("/")}><ArrowLeft size={15} /> Library</button>
+            <div className="title">
+              <h1>{book.title}</h1>
+              <div className="meta">{book.typeName} · by {book.author} · {totalWords.toLocaleString()} words · ~{readingMinutes(totalWords)} min</div>
+            </div>
+            <div className="spacer" />
+            {savedAt && <span className="saved">Saved {savedAt.toLocaleTimeString()}</span>}
+            <div className="segmented">
+              <button className={mode === "read" ? "active" : ""} onClick={() => setMode("read")}>
+                <Eye size={14} /> <span className="seg-label">Read</span>
+              </button>
+              <button className={mode === "edit" ? "active" : ""} onClick={() => setMode("edit")}>
+                <Pencil size={14} /> <span className="seg-label">Edit</span>
+              </button>
+            </div>
+            <button className="back" onClick={() => setFocus(!focus)}>
+              {focus ? <Minimize size={15} /> : <Maximize size={15} />} {focus ? "Exit" : "Focus"}
+            </button>
+          </>
+        ) : (
+          <>
+            <button className="back" onClick={() => router.push("/")} title="Library"><ChevronLeft size={15} /></button>
+            <div className="title">
+              <h1>{book.title}</h1>
+              <div className="meta">{book.typeName} · by {book.author} · {totalWords.toLocaleString()} words · ~{readingMinutes(totalWords)} min</div>
+            </div>
+            <div className="spacer" />
+            <button className="btn btn-dark" onClick={() => setMode("edit")}><Pencil size={14} /> Edit</button>
+          </>
+        )}
       </header>
 
       {navOpen && <div className="scrim" onClick={() => setNavOpen(false)} />}
@@ -322,6 +367,10 @@ export default function BookPage() {
                   Next <ChevronRight size={15} />
                 </button>
               </div>
+              <div className="mvisuals no-print">
+                {factCard}
+                {chartCard}
+              </div>
             </>
           )}
 
@@ -405,30 +454,9 @@ export default function BookPage() {
 
         {!focus && chapter && (
           <aside className="insights">
-            <div className="inscard factcard">
-              <h3><Lightbulb size={14} /> The fact hidden in this chapter</h3>
-              {facts.length > 0 ? (
-                facts.map((f, i) => <p key={i}>{f}</p>)
-              ) : (
-                <p>Every chapter of this book hides one true fact inside the story. This chapter does not have one yet — write one in, and it will appear here.</p>
-              )}
-              <div className="src">From “{chapter.title}” — story first, fact inside.</div>
-            </div>
+            {factCard}
 
-            <div className="inscard">
-              <h3><BarChart3 size={14} /> Chapter lengths</h3>
-              <div className="chartbar">
-                {(book.chapters || []).map((c) => {
-                  const w = countWords(c.content || "");
-                  return (
-                    <div key={c.id} className={"col" + (c.id === chapterId ? " cur" : "")} onClick={() => setChapterId(c.id)} style={{ cursor: "pointer" }} title={`${c.title} — ${w.toLocaleString()} words`}>
-                      <div className="bar" style={{ height: Math.max(6, Math.round((w / maxChapterWords) * 64)) + "px" }} />
-                      <div className="clbl">{c.title.replace(/^Chapter \d+ — /, "").slice(0, 10) || "Ch"}</div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+            {chartCard}
 
             <div className="inscard">
               <h3><Target size={14} /> Reading this book</h3>
