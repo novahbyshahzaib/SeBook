@@ -12,7 +12,7 @@ import {
   getTodayWords, addTodayWords, bookToMarkdown, extractFacts, htmlToText,
   isIntegrationEnabled, pushBooksToCloud, pullBooksFromCloud
 } from "../../../lib/store";
-import { ReadAloud, VOICES, DEFAULT_VOICE, fetchVoices, voiceLabel, getGroqKey, saveGroqKey, clearGroqKey, voiceNeedsKey, GROQ_VOICE_IDS, GOOGLE_VOICE_ID } from "../../../lib/readAloud";
+import { ReadAloud, VOICES, DEFAULT_VOICE, fetchVoices, voiceLabel } from "../../../lib/readAloud";
 
 function uid() {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
@@ -44,15 +44,11 @@ export default function BookPage() {
   const [voice, setVoice] = useState(() => {
     try {
       const saved = localStorage.getItem("sebook-voice") || "";
-      // An old Microsoft voice id (en-US-AriaNeural…) is not a voice
-      // anymore; fall back to the default when the saved value is not one.
-      return [...GROQ_VOICE_IDS, GOOGLE_VOICE_ID].includes(saved) ? saved : DEFAULT_VOICE;
+      // Only the basic voice exists now; fall back to it for any old
+      // saved value (Groq and Microsoft voice ids are gone).
+      return saved === DEFAULT_VOICE ? saved : DEFAULT_VOICE;
     } catch { return DEFAULT_VOICE; }
   });
-  // The reader's free Groq key for the realistic voices, kept only in
-  // this browser. The Basic voice needs no key.
-  const [groqKey, setGroqKey] = useState(() => getGroqKey());
-  const [groqKeySaved, setGroqKeySaved] = useState(() => getGroqKey().length > 0);
   const [speed, setSpeed] = useState(() => {
     try { return parseFloat(localStorage.getItem("sebook-speed") || "1") || 1; } catch { return 1; }
   });
@@ -238,18 +234,6 @@ export default function BookPage() {
     if (groups.groq) out.push({ key: "groq", label: "REALISTIC VOICES — GROQ (FREE KEY)", voices: groups.groq.sort((a, b) => a.FriendlyName.localeCompare(b.FriendlyName)) });
     if (groups.basic) out.push({ key: "basic", label: "BASIC VOICE — NO KEY", voices: groups.basic });
     return out;
-  }
-
-  function saveGroqKeyFromInput() {
-    const k = (groqKey || "").trim();
-    saveGroqKey(k);
-    setGroqKeySaved(k.length > 0);
-  }
-
-  function removeGroqKey() {
-    clearGroqKey();
-    setGroqKey("");
-    setGroqKeySaved(false);
   }
 
   // Stop the voice when the chapter changes, when switching to Edit,
@@ -476,7 +460,7 @@ export default function BookPage() {
                     <button className="btn btn-dark" onClick={startListen}>
                       <Volume2 size={16} /> Listen to this chapter
                     </button>
-                    <span className="listen-note">Read aloud by a real, human-sounding voice — free Groq voices (needs a free key, no card) or the Basic voice with no key. It needs internet every time it reads.</span>
+                    <span className="listen-note">Read aloud by a free voice — no key, no sign-up. It needs internet every time it reads.</span>
                   </>
                 ) : (
                   <div className="listen-controls">
@@ -493,40 +477,25 @@ export default function BookPage() {
                         </>
                       )}
                     </div>
-                    <label className="listen-pick">
-                      Voice ({voiceList.length})
-                      <input
-                        className="listen-search"
-                        type="search"
-                        placeholder="Search voices…"
-                        value={voiceSearch}
-                        onChange={(e) => setVoiceSearch(e.target.value)}
-                      />
-                      <select value={voice} onChange={(e) => changeVoice(e.target.value)}>
-                        {voiceGroups().map((g) => (
-                          <optgroup key={g.key} label={g.label}>
-                            {g.voices.map((v) => (
-                              <option key={v.Name} value={v.Name}>{voiceLabel(v)}</option>
-                            ))}
-                          </optgroup>
-                        ))}
-                      </select>
-                    </label>
-                    {voiceNeedsKey(voice) && (
+                    {voiceList.length > 1 && (
                       <label className="listen-pick">
-                        Groq key {groqKeySaved ? "— saved" : "— needed for this voice"}
+                        Voice ({voiceList.length})
                         <input
                           className="listen-search"
-                          type="password"
-                          placeholder="Paste your free Groq key…"
-                          value={groqKey}
-                          onChange={(e) => { setGroqKey(e.target.value); setGroqKeySaved(false); }}
+                          type="search"
+                          placeholder="Search voices…"
+                          value={voiceSearch}
+                          onChange={(e) => setVoiceSearch(e.target.value)}
                         />
-                        <span className="listen-note">Free key, no card: console.groq.com → API Keys → Create. The key stays in this browser only.</span>
-                        <span className="listen-keyrow">
-                          <button type="button" className="btn btn-dark" onClick={saveGroqKeyFromInput}>Save key</button>
-                          {groqKeySaved && <button type="button" className="btn btn-light" onClick={removeGroqKey}>Remove</button>}
-                        </span>
+                        <select value={voice} onChange={(e) => changeVoice(e.target.value)}>
+                          {voiceGroups().map((g) => (
+                            <optgroup key={g.key} label={g.label}>
+                              {g.voices.map((v) => (
+                                <option key={v.Name} value={v.Name}>{voiceLabel(v)}</option>
+                              ))}
+                            </optgroup>
+                          ))}
+                        </select>
                       </label>
                     )}
                     <label className="listen-pick">
