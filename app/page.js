@@ -49,6 +49,24 @@ export default function Home() {
   const pct = Math.min(100, Math.round((today / goal) * 100));
   const selectedType = BOOK_TYPES.find((t) => t.id === type);
 
+  // The exact message to paste into your AI — it teaches the AI how
+  // SeBook's integration works (the address, the key, and every command),
+  // so it can read and write your books. The key is already filled in.
+  function integrationMessage() {
+    const k = intKey;
+    return `SeBook is my book-writing app at https://sebook.vercel.app. It has a Muse Integration: with my key, you can read and write my books through its API. My integration key is: ${k}
+
+To see my books, POST JSON to https://sebook.vercel.app/api/integration/write with {"key": "${k}", "action": "list_books"}. To read one book fully, use {"key": "${k}", "action": "get_book", "bookId": "BOOK_ID"}.
+To write, POST to the same address:
+- New book: {"key": "${k}", "action": "create_book", "title": "...", "type": "novel", "author": "..."}
+- New chapter: {"key": "${k}", "action": "create_chapter", "bookId": "...", "title": "...", "content": "..."}
+- Rewrite a chapter: {"key": "${k}", "action": "set_chapter", "bookId": "...", "chapterId": "...", "content": "..."}
+- Add text to a chapter: {"key": "${k}", "action": "append_chapter", "bookId": "...", "chapterId": "...", "text": "..."}
+- Rename the book: {"key": "${k}", "action": "set_title", "bookId": "...", "title": "..."}
+- Add a character: {"key": "${k}", "action": "add_character", "bookId": "...", "name": "...", "role": "...", "desc": "..."}
+Content can be plain text or HTML. After you write, tell me to open SeBook or tap Sync now to see it.`;
+  }
+
   function handleCreate() {
     const book = createBook(title, type, author);
     const next = [book, ...books];
@@ -252,6 +270,24 @@ export default function Home() {
               {syncMsg && <> {syncMsg}</>}
             </p>
             <p className="intstatus">When this is on, a copy of your books is also kept in SeBook&rsquo;s private cloud so Muse and this app can see the same books. Turn it off any time to stop that.</p>
+            {intKey && (
+              <>
+                <h3 className="inthead">What to paste in your AI</h3>
+                <p className="intstatus">Copy this whole message and paste it into your Muse chat. It tells your AI how SeBook works, so it can read and write your books. This message already has your key inside it — keep it private, like a password.</p>
+                <textarea className="intmsg" readOnly value={integrationMessage()} onFocus={(e) => e.target.select()} />
+                <div className="introw" style={{ marginTop: 10 }}>
+                  <button className="btn btn-bronze" onClick={() => { navigator.clipboard?.writeText(integrationMessage()); setSyncMsg("Instructions copied — paste them into your Muse chat."); }}>
+                    <Copy size={15} /> Copy the message for your AI
+                  </button>
+                </div>
+                <h3 className="inthead">What your AI will do after you paste it</h3>
+                <ul className="intsteps">
+                  <li>It will be able to see your books and read any chapter.</li>
+                  <li>You can ask it to write a chapter, a whole story, or add characters — it writes straight into SeBook.</li>
+                  <li>After it writes, it will tell you to open SeBook or tap Sync now, and the new writing will be there.</li>
+                </ul>
+              </>
+            )}
           </div>
         </div>
       </main>
